@@ -1,0 +1,155 @@
+import 'package:flutter/material.dart';
+import 'widgets/common_widgets.dart';
+import 'widgets/side_menu.dart';
+import 'screens/login_screen.dart';
+import 'screens/signup_screen.dart';
+import 'screens/component_selection_screen.dart';
+import 'screens/product_listing_screen.dart'; 
+import 'screens/cart_screen.dart';
+import 'screens/confirm_order_screen.dart';
+import 'screens/order_confirmed_screen.dart';
+import 'data/product_data.dart';
+
+enum ScreenType { login, signUp, components, listing, cart, confirmOrder, orderConfirmed }
+
+void main() => runApp(const MyApp());
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'BuildX PC Builder',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        primaryColor: const Color(0xFFE50914),
+        scaffoldBackgroundColor: const Color(0xFF141414),
+        cardColor: const Color(0xFF1F1F1F),
+        appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF141414), elevation: 0),
+      ),
+      home: const MainScreen(),
+    );
+  }
+}
+
+class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+  @override
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  ScreenType _currentScreen = ScreenType.login;
+  Map<String, Product> _selectedComponents = {};
+  String _currentCategory = 'Processor';
+  final List<ScreenType> _screenHistory = [ScreenType.login];
+  int _historyIndex = 0;
+
+  void _navigateTo(ScreenType screen) {
+    setState(() {
+      if (_historyIndex < _screenHistory.length - 1) {
+        _screenHistory.removeRange(_historyIndex + 1, _screenHistory.length);
+      }
+      _screenHistory.add(screen);
+      _historyIndex = _screenHistory.length - 1;
+      _currentScreen = screen;
+    });
+  }
+
+  void _goBack() {
+    if (_historyIndex > 0) {
+      setState(() {
+        _historyIndex--;
+        _currentScreen = _screenHistory[_historyIndex];
+      });
+    }
+  }
+
+  void _handleLogout() {
+    setState(() {
+      _screenHistory.clear();
+      _screenHistory.add(ScreenType.login);
+      _historyIndex = 0;
+      _currentScreen = ScreenType.login;
+      _selectedComponents.clear();
+    });
+  }
+
+  List<Map<String, dynamic>> _getCartItems() {
+    return _selectedComponents.entries.map((entry) => {
+      'category': entry.key,
+      'name': entry.value.name,
+      'price': entry.value.price,
+      'details': entry.value.specs,
+    }).toList();
+  }
+
+  Widget _buildScreen() {
+    switch (_currentScreen) {
+      case ScreenType.login:
+        return LoginScreen(onLogin: () => _navigateTo(ScreenType.components), onSignUp: () => _navigateTo(ScreenType.signUp));
+      case ScreenType.signUp:
+        return SignUpScreen(onSignUp: () => _navigateTo(ScreenType.components), onLogin: () => _navigateTo(ScreenType.login));
+      case ScreenType.components:
+        return ComponentSelectionScreen(
+          onViewCart: () => _navigateTo(ScreenType.cart),
+          onSelectComponent: (cat) {
+            setState(() => _currentCategory = cat);
+            _navigateTo(ScreenType.listing);
+          },
+          onLogout: _handleLogout,
+          // FIX: Changed from 'selectedItems' back to 'cartItem' to match your file
+          cartItem: _selectedComponents.isNotEmpty ? _selectedComponents.values.first : null, 
+        );
+      case ScreenType.listing:
+        return ProductListingScreen(
+          categoryTitle: _currentCategory,
+          products: ProductRepository.componentData[_currentCategory] ?? [],
+          onProductAdded: (p) {
+            setState(() {
+              _selectedComponents[_currentCategory] = p;
+            });
+            _goBack(); 
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('${p.name} added!'), backgroundColor: Colors.green),
+            );
+          },
+          onNavigateBack: _goBack,
+        );
+      case ScreenType.cart:
+        return CartScreen(
+          items: _getCartItems(),
+          onRemoveItem: (category) {
+            setState(() => _selectedComponents.remove(category));
+          },
+          onNavigateBack: _goBack, 
+          onCheckout: () => _navigateTo(ScreenType.confirmOrder)
+        );
+      case ScreenType.confirmOrder:
+        return ConfirmOrderScreen(
+          // FIX: Changed 'items' to 'item' to match your ConfirmOrderScreen parameter
+          item: _getCartItems().isNotEmpty ? _getCartItems().first : null, 
+          onNavigateBack: _goBack, 
+          onConfirm: () => _navigateTo(ScreenType.orderConfirmed)
+        );
+      case ScreenType.orderConfirmed:
+        return OrderConfirmedScreen(onStartNewBuild: () {
+          setState(() => _selectedComponents.clear());
+          _navigateTo(ScreenType.components);
+        });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool showMenu = _currentScreen != ScreenType.login && _currentScreen != ScreenType.signUp;
+    return Scaffold(
+      drawer: showMenu ? SideMenu(onLogout: _handleLogout) : null,
+      body: _buildScreen(),
+      // Arrows removed from here
+      bottomNavigationBar: null, 
+    );
+  }
+}
