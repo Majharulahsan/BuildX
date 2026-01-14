@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "272286459082",
+    "project_id": "buildx-8befd",
+    "storage_bucket": "buildx-8befd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:272286459082:android:61842aad6233b7febf8033",
+        "android_client_info": {
+          "package_name": "com.example.buildx"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAptVwbLzleQoKSJXk_k1xyVrUZsNe9zE0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
