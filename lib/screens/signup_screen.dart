@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Added Firestore
 import '../widgets/common_widgets.dart';
 
 class SignUpScreen extends StatefulWidget {
-  final VoidCallback onSignUp; // This usually goes to the main app
-  final VoidCallback onLogin;  // This goes back to the Login screen
+  final VoidCallback onSignUp;
+  final VoidCallback onLogin;
 
-  const SignUpScreen({
-    super.key,
-    required this.onSignUp,
-    required this.onLogin,
-  });
+  const SignUpScreen({super.key, required this.onSignUp, required this.onLogin});
 
   @override
   State<SignUpScreen> createState() => _SignUpScreenState();
@@ -23,57 +20,45 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isLoading = false;
 
   Future<void> _handleSignUp() async {
-    // Basic validation
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill in all required fields")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill in all fields")));
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      // 1. Create the user in Firebase
+      // 1. Create User in Auth
       UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // 2. Update display name if provided
-      if (userCredential.user != null && _nameController.text.isNotEmpty) {
+      // 2. Save Role and Data to Firestore
+      await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+        'uid': userCredential.user!.uid,
+        'name': _nameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'role': 'user', // Default role is 'user'
+        'createdAt': DateTime.now(),
+      });
+
+      if (userCredential.user != null) {
         await userCredential.user!.updateDisplayName(_nameController.text.trim());
       }
 
-      // 3. FORCE LOGOUT 
-      // Firebase auto-logs in after creation; we stop that here.
+      // 3. Force Logout & Redirect
       await FirebaseAuth.instance.signOut();
 
-      // 4. Notify the user
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Account created successfully! Please log in."),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
+          const SnackBar(content: Text("Account created! Please log in."), backgroundColor: Colors.green),
         );
       }
-
-      // 5. Navigate back to Login screen
       widget.onLogin();
 
     } on FirebaseAuthException catch (e) {
-      String message = "An error occurred";
-      if (e.code == 'weak-password') message = "The password is too weak.";
-      else if (e.code == 'email-already-in-use') message = "Account already exists.";
-      else if (e.code == 'invalid-email') message = "Invalid email format.";
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
-      );
-    } catch (e) {
-      debugPrint(e.toString());
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? "Error"), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -98,63 +83,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const LogoHeader(subtitle: 'Create a new account'),
-              
-              // Name Field
-              TextFormField(
-                controller: _nameController,
-                keyboardType: TextInputType.name,
-                decoration: const InputDecoration(
-                  labelText: 'Full Name',
-                  prefixIcon: Icon(Icons.person_outline),
-                ),
-                style: const TextStyle(color: Colors.white),
-              ),
+              TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline)), style: const TextStyle(color: Colors.white)),
               const SizedBox(height: 16),
-              
-              // Email Field
-              TextFormField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'Email Address',
-                  prefixIcon: Icon(Icons.email_outlined),
-                ),
-                style: const TextStyle(color: Colors.white),
-              ),
+              TextFormField(controller: _emailController, decoration: const InputDecoration(labelText: 'Email Address', prefixIcon: Icon(Icons.email_outlined)), style: const TextStyle(color: Colors.white)),
               const SizedBox(height: 16),
-              
-              // Password Field
-              TextFormField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: Icon(Icons.lock_outline),
-                ),
-                style: const TextStyle(color: Colors.white),
-              ),
+              TextFormField(controller: _passwordController, obscureText: true, decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline)), style: const TextStyle(color: Colors.white)),
               const SizedBox(height: 32),
-              
-              // Sign Up Button
-              _isLoading 
-                ? const Center(child: CircularProgressIndicator()) 
-                : PrimaryButton(
-                    text: 'Sign Up',
-                    onPressed: _handleSignUp,
-                  ),
+              _isLoading ? const Center(child: CircularProgressIndicator()) : PrimaryButton(text: 'Sign Up', onPressed: _handleSignUp),
               const SizedBox(height: 24),
-              
-              // Back to Login Link
-              TextButton(
-                onPressed: widget.onLogin,
-                child: Text(
-                  "Already have an account? Log In",
-                  style: TextStyle(
-                    color: Theme.of(context).primaryColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+              TextButton(onPressed: widget.onLogin, child: Text("Already have an account? Log In", style: TextStyle(color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold))),
             ],
           ),
         ),

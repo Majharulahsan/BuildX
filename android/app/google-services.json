@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "272286459082",
-    "project_id": "buildx-8befd",
-    "storage_bucket": "buildx-8befd.firebasestorage.app"
+    "project_number": "805977044578",
+    "project_id": "buildx-bff0c",
+    "storage_bucket": "buildx-bff0c.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:272286459082:android:61842aad6233b7febf8033",
+        "mobilesdk_app_id": "1:805977044578:android:939bfc8205ca8963ab833b",
         "android_client_info": {
           "package_name": "com.example.buildx"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAptVwbLzleQoKSJXk_k1xyVrUZsNe9zE0"
+          "current_key": "AIzaSyArRh260eRET0Fx1KTiyeTZwy2BWPpv8A0"
         }
       ],
       "services": {
