@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/common_widgets.dart';
+import '../data/product_data.dart';
 
 class Product {
   final String name;
@@ -19,14 +21,14 @@ class Product {
 
 class ProductListingScreen extends StatefulWidget {
   final String categoryTitle;
-  final List<Product> products;
+  final String category;
   final VoidCallback onNavigateBack;
   final Function(Product) onProductAdded;
 
   const ProductListingScreen({
     super.key,
     required this.categoryTitle,
-    required this.products,
+    required this.category,
     required this.onNavigateBack,
     required this.onProductAdded,
   });
@@ -37,20 +39,32 @@ class ProductListingScreen extends StatefulWidget {
 
 class _ProductListingScreenState extends State<ProductListingScreen> {
   late List<Product> _filteredProducts;
+  List<Product> _allProducts = [];
   final TextEditingController _searchController = TextEditingController();
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _filteredProducts = widget.products;
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    setState(() => _isLoading = true);
+    final products = await ProductRepository.getProductsByCategory(widget.category);
+    setState(() {
+      _allProducts = products;
+      _filteredProducts = products;
+      _isLoading = false;
+    });
   }
 
   void _runFilter(String enteredKeyword) {
     setState(() {
       if (enteredKeyword.isEmpty) {
-        _filteredProducts = widget.products;
+        _filteredProducts = _allProducts;
       } else {
-        _filteredProducts = widget.products
+        _filteredProducts = _allProducts
             .where((product) =>
                 product.name.toLowerCase().contains(enteredKeyword.toLowerCase()) ||
                 product.specs.toLowerCase().contains(enteredKeyword.toLowerCase()))
@@ -89,7 +103,7 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
                 child: TextField(
                   controller: _searchController,
                   onChanged: (value) => _runFilter(value),
-                  autofocus: false, // Prevents keyboard from jumping up instantly
+                  autofocus: false,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'Search for ${widget.categoryTitle.toLowerCase()}...',
@@ -105,7 +119,7 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
                           )
                         : null,
                     filled: true,
-                    fillColor: const Color(0xFF262626), // Lighter than background to stand out
+                    fillColor: const Color(0xFF262626),
                     contentPadding: const EdgeInsets.symmetric(vertical: 0),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -118,33 +132,39 @@ class _ProductListingScreenState extends State<ProductListingScreen> {
           ),
 
           // 2. The Results List
-          _filteredProducts.isEmpty
+          _isLoading
               ? const SliverFillRemaining(
                   child: Center(
-                    child: Text('No products found.', style: TextStyle(color: Colors.grey)),
+                    child: CircularProgressIndicator(color: Colors.red),
                   ),
                 )
-              : SliverPadding(
-                  padding: const EdgeInsets.all(16),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final product = _filteredProducts[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16.0),
-                          child: ProductListItem(
-                            name: product.name,
-                            specs: product.specs,
-                            rating: product.rating,
-                            price: product.price,
-                            onAdd: () => widget.onProductAdded(product),
-                          ),
-                        );
-                      },
-                      childCount: _filteredProducts.length,
+              : _filteredProducts.isEmpty
+                  ? const SliverFillRemaining(
+                      child: Center(
+                        child: Text('No products found.', style: TextStyle(color: Colors.grey)),
+                      ),
+                    )
+                  : SliverPadding(
+                      padding: const EdgeInsets.all(16),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final product = _filteredProducts[index];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16.0),
+                              child: ProductListItem(
+                                name: product.name,
+                                specs: product.specs,
+                                rating: product.rating,
+                                price: product.price,
+                                onAdd: () => widget.onProductAdded(product),
+                              ),
+                            );
+                          },
+                          childCount: _filteredProducts.length,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
         ],
       ),
     );

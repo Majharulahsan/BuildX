@@ -10,9 +10,12 @@ import 'screens/product_listing_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/confirm_order_screen.dart';
 import 'screens/order_confirmed_screen.dart';
+import 'screens/admin_product_management_screen.dart';
+import 'screens/admin_add_product_screen.dart';
+import 'screens/payment_screen.dart';
 import 'data/product_data.dart';
 
-enum ScreenType { login, signUp, components, listing, cart, confirmOrder, orderConfirmed }
+enum ScreenType { login, signUp, components, listing, cart, confirmOrder, orderConfirmed, adminProducts, adminAddProduct, adminEditProduct, payment }
 
 // Step 3: Initialize Firebase
 void main() async {
@@ -55,6 +58,7 @@ class _MainScreenState extends State<MainScreen> {
   String _currentCategory = 'Processor';
   final List<ScreenType> _screenHistory = [ScreenType.login];
   int _historyIndex = 0;
+  Map<String, dynamic>? _productToEdit;
 
   void _navigateTo(ScreenType screen) {
     setState(() {
@@ -109,12 +113,17 @@ class _MainScreenState extends State<MainScreen> {
             _navigateTo(ScreenType.listing);
           },
           onLogout: _handleLogout,
-          cartItem: _selectedComponents.isNotEmpty ? _selectedComponents.values.first : null, 
+          cartItem: _selectedComponents.isNotEmpty ? _selectedComponents.values.first : null,
+          onNavigate: (route) {
+            if (route == 'adminProducts') {
+              _navigateTo(ScreenType.adminProducts);
+            }
+          },
         );
       case ScreenType.listing:
         return ProductListingScreen(
           categoryTitle: _currentCategory,
-          products: ProductRepository.componentData[_currentCategory] ?? [],
+          category: _currentCategory,
           onProductAdded: (p) {
             setState(() {
               _selectedComponents[_currentCategory] = p;
@@ -139,7 +148,31 @@ class _MainScreenState extends State<MainScreen> {
         return ConfirmOrderScreen(
           item: _getCartItems().isNotEmpty ? _getCartItems().first : null, 
           onNavigateBack: _goBack, 
-          onConfirm: () => _navigateTo(ScreenType.orderConfirmed)
+          onConfirm: () => _navigateTo(ScreenType.payment)
+        );
+      case ScreenType.payment:
+        return PaymentScreen(
+          items: _getCartItems(),
+          onNavigateBack: _goBack,
+          onPaymentComplete: () => _navigateTo(ScreenType.orderConfirmed),
+        );
+      case ScreenType.adminProducts:
+        return AdminProductManagementScreen(
+          onNavigateBack: _goBack,
+          onAddProduct: () => _navigateTo(ScreenType.adminAddProduct),
+          onEditProduct: (product) {
+            setState(() => _productToEdit = product);
+            _navigateTo(ScreenType.adminEditProduct);
+          },
+        );
+      case ScreenType.adminAddProduct:
+        return AdminAddProductScreen(
+          onNavigateBack: _goBack,
+        );
+      case ScreenType.adminEditProduct:
+        return AdminAddProductScreen(
+          onNavigateBack: _goBack,
+          existingProduct: _productToEdit,
         );
       case ScreenType.orderConfirmed:
         return OrderConfirmedScreen(onStartNewBuild: () {
@@ -153,7 +186,14 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final bool showMenu = _currentScreen != ScreenType.login && _currentScreen != ScreenType.signUp;
     return Scaffold(
-      drawer: showMenu ? SideMenu(onLogout: _handleLogout) : null,
+      drawer: showMenu ? SideMenu(
+        onLogout: _handleLogout,
+        onNavigate: (route) {
+          if (route == 'adminProducts') {
+            _navigateTo(ScreenType.adminProducts);
+          }
+        },
+      ) : null,
       body: _buildScreen(),
       bottomNavigationBar: null, 
     );

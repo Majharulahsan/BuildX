@@ -4,8 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SideMenu extends StatefulWidget {
   final VoidCallback onLogout;
+  final Function(String)? onNavigate; // Add navigation callback
 
-  const SideMenu({super.key, required this.onLogout});
+  const SideMenu({super.key, required this.onLogout, this.onNavigate});
 
   @override
   State<SideMenu> createState() => _SideMenuState();
@@ -128,7 +129,10 @@ class _SideMenuState extends State<SideMenu> {
                     padding: EdgeInsets.only(left: 16, top: 20, bottom: 10),
                     child: Text("ADMIN TOOLS", style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 12)),
                   ),
-                  _buildMenuItem(Icons.add_box_outlined, "Add New Components", color: Colors.amber),
+                  _buildMenuItem(Icons.add_box_outlined, "Add New Components", color: Colors.amber, onTap: () {
+                    Navigator.pop(context);
+                    widget.onNavigate?.call('adminProducts');
+                  }),
                   _buildMenuItem(Icons.analytics_outlined, "Sales Report", color: Colors.amber),
                   const Divider(color: Colors.white10),
                 ],
@@ -167,13 +171,13 @@ class _SideMenuState extends State<SideMenu> {
     );
   }
 
-  Widget _buildMenuItem(IconData icon, String title, {Color color = Colors.white70}) {
+  Widget _buildMenuItem(IconData icon, String title, {Color color = Colors.white70, VoidCallback? onTap}) {
     return ListTile(
       leading: Icon(icon, color: color, size: 28),
       title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16)),
       trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
-      onTap: () {
-        // Navigation logic for Admin or User screens goes here
+      onTap: onTap ?? () {
+        // Default navigation logic for non-admin screens goes here
       },
     );
   }

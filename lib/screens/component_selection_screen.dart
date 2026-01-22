@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/side_menu.dart';
-import 'product_listing_screen.dart'; 
+import 'product_listing_screen.dart';
+import '../data/product_data.dart'; 
 
 class ComponentSelectionScreen extends StatelessWidget {
   final VoidCallback onViewCart;
   final Function(String) onSelectComponent;
   final VoidCallback onLogout;
-  final Product? cartItem; // This is used to check if the cart has items
+  final Product? cartItem;
+  final Function(String)? onNavigate;
 
   const ComponentSelectionScreen({
     super.key,
@@ -15,27 +18,16 @@ class ComponentSelectionScreen extends StatelessWidget {
     required this.onSelectComponent,
     required this.onLogout,
     this.cartItem,
+    this.onNavigate,
   });
-
-  static const _componentCategories = [
-    {'name': 'Processor', 'icon': Icons.memory, 'color': Colors.red},
-    {'name': 'Motherboard', 'icon': Icons.developer_board, 'color': Colors.blueGrey},
-    {'name': 'RAM', 'icon': Icons.sd_storage, 'color': Colors.green},
-    {'name': 'Storage', 'icon': Icons.dvr, 'color': Colors.purple},
-    {'name': 'GPU', 'icon': Icons.videogame_asset, 'color': Colors.orange},
-    {'name': 'Cooling', 'icon': Icons.ac_unit, 'color': Colors.cyan},
-    {'name': 'PSU', 'icon': Icons.flash_on, 'color': Colors.yellow},
-    {'name': 'Case', 'icon': Icons.all_out, 'color': Colors.pink},
-  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: SideMenu(onLogout: onLogout),
+      drawer: SideMenu(onLogout: onLogout, onNavigate: onNavigate),
       appBar: AppBar(
         title: const Text('BuildX', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
-          // Added a Cart Icon in the AppBar for easier access
           IconButton(
             icon: const Icon(Icons.shopping_cart),
             onPressed: onViewCart,
@@ -46,7 +38,6 @@ class ComponentSelectionScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Status bar showing building progress
             AppCard(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -68,21 +59,72 @@ class ComponentSelectionScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, 
-                  crossAxisSpacing: 16.0, 
-                  mainAxisSpacing: 16.0, 
-                  childAspectRatio: 0.85
-                ),
-                itemCount: _componentCategories.length,
-                itemBuilder: (context, index) {
-                  final item = _componentCategories[index];
-                  return _ComponentCard(
-                    name: item['name'] as String,
-                    icon: item['icon'] as IconData,
-                    iconColor: item['color'] as Color,
-                    onSelect: () => onSelectComponent(item['name'] as String),
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('products').snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator(color: Color(0xFFE50914)));
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.red)),
+                    );
+                  }
+
+                  // Get unique categories from products
+                  final categories = <String>{};
+                  if (snapshot.hasData) {
+                    for (var doc in snapshot.data!.docs) {
+                      final category = doc.data() as Map<String, dynamic>;
+                      if (category['category'] != null) {
+                        categories.add(category['category']);
+                      }
+                    }
+                  }
+
+                  final categoryList = categories.toList()..sort();
+
+                  if (categoryList.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey[700]),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No categories available',
+                            style: TextStyle(fontSize: 18, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Admin needs to add products first',
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return GridView.builder(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 16.0,
+                      mainAxisSpacing: 16.0,
+                      childAspectRatio: 0.85,
+                    ),
+                    itemCount: categoryList.length,
+                    itemBuilder: (context, index) {
+                      final category = categoryList[index];
+                      final categoryInfo = ProductRepository.getCategoryInfo(category);
+                      
+                      return _ComponentCard(
+                        name: category,
+                        iconName: categoryInfo['icon'],
+                        iconColorName: categoryInfo['color'],
+                        onSelect: () => onSelectComponent(category),
+                      );
+                    },
                   );
                 },
               ),
@@ -96,17 +138,55 @@ class ComponentSelectionScreen extends StatelessWidget {
 
 class _ComponentCard extends StatelessWidget {
   final String name;
-  final IconData icon;
-  final Color iconColor;
+  final String iconName;
+  final String iconColorName;
   final VoidCallback onSelect;
 
-  const _ComponentCard({required this.name, required this.icon, required this.iconColor, required this.onSelect});
+  const _ComponentCard({
+    required this.name,
+    required this.iconName,
+    required this.iconColorName,
+    required this.onSelect,
+  });
+
+  IconData _getIconData(String iconName) {
+    const iconMap = {
+      'memory': Icons.memory,
+      'developer_board': Icons.developer_board,
+      'sd_storage': Icons.sd_storage,
+      'dvr': Icons.dvr,
+      'videogame_asset': Icons.videogame_asset,
+      'ac_unit': Icons.ac_unit,
+      'flash_on': Icons.flash_on,
+      'all_out': Icons.all_out,
+      'category': Icons.category,
+    };
+    return iconMap[iconName] ?? Icons.category;
+  }
+
+  Color _getColor(String colorName) {
+    const colorMap = {
+      'red': Colors.red,
+      'blueGrey': Colors.blueGrey,
+      'green': Colors.green,
+      'purple': Colors.purple,
+      'orange': Colors.orange,
+      'cyan': Colors.cyan,
+      'yellow': Colors.yellow,
+      'pink': Colors.pink,
+      'grey': Colors.grey,
+    };
+    return colorMap[colorName] ?? Colors.grey;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final icon = _getIconData(iconName);
+    final iconColor = _getColor(iconColorName);
+    
     return AppCard(
       padding: EdgeInsets.zero,
-      child: InkWell( // Making the whole card clickable
+      child: InkWell(
         onTap: onSelect,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -119,7 +199,7 @@ class _ComponentCard extends StatelessWidget {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.05),
-                shape: BoxShape.circle
+                shape: BoxShape.circle,
               ),
               child: const Icon(Icons.add, size: 20, color: Colors.white),
             )
